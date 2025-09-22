@@ -444,8 +444,11 @@ class Jira:
                     self.field('summary'): f'[{release.label}] Bootimage bump tracker',
                     self.field('description'): desc,
                     self.field('severity'): {'value': self._config.get('jira_severity', 'Moderate')},
-                    self.field('target_versions'): [{'name': release.target_version}],
                     self.field('labels'): [self.BOOTIMAGE_TRACKER_LABEL],
+                })
+                # Target Version must be set after OCPBUGS isuse creation
+                issue.update(fields={
+                    self.field('target_versions'): [{'name': release.target_version}],
                 })
                 for watcher in self._config.get('jira_watchers', []):
                     self.api.add_watcher(issue.id, watcher)
@@ -723,7 +726,6 @@ class CommandHandler(metaclass=Registry):
                     self._jira.field('severity'): {'value': issue.fields.severity.value},
                     self._jira.field('labels'): issue.fields.labels,
                     self._jira.field('affects_versions'): [{'name': v.name} for v in issue.fields.affects_versions],
-                    self._jira.field('target_versions'): [{'name': rel.target_version}],
                 }
                 if hasattr(issue.fields, 'security'):
                     fields[self._jira.field('security')] = {'name': issue.fields.security.name}
@@ -731,6 +733,10 @@ class CommandHandler(metaclass=Registry):
                     fields[self._jira.field('labels')].append(self._jira.BOOTIMAGE_ISSUE_LABEL)
                 prev_issue = cur_issue
                 cur_issue = self._jira.api.create_issue(fields=fields)
+                # Target Version must be set after OCPBUGS isuse creation
+                cur_issue.update(fields={
+                    self._jira.field('target_versions'): [{'name': rel.target_version}],
+                })
                 self._jira.api.assign_issue(
                     cur_issue.id,
                     issue.fields.assignee.name if issue.fields.assignee else None
